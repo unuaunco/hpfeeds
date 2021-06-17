@@ -22,7 +22,9 @@ AC_PROG_CC
 AC_PROG_MAKE_SET
 AC_PROG_LIBTOOL
 
-AC_CHECK_HEADERS([arpa/inet.h sys/types.h])
+AC_CHECK_LIB(ws2_32, main, ,
+            [AC_MSG_ERROR([cannot link with ws2_32.dll.])])
+AC_CHECK_HEADERS([arpa/inet.h sys/types.h winsock2.h])
 
 AC_TYPE_SIZE_T
 
