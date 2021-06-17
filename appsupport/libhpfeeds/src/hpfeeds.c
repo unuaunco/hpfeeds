@@ -16,10 +16,17 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <arpa/inet.h>
+#ifdef __linux__ 
+    #include <arpa/inet.h>
+#elif _WIN32
+    #include <winsock2.h>
+#else
+    //placeholder
+#endif
 #include <hpfeeds.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 
 #include "sha1.h"
 
@@ -27,7 +34,7 @@
 hpf_msg_t *hpf_msg_new(void) {
 	hpf_msg_t *msg;
 
-	msg = calloc(1, sizeof(hpf_msg_t));
+	msg = (hpf_msg_t*)calloc(1, sizeof(hpf_msg_t));
 	msg->hdr.msglen = htonl(sizeof(msg->hdr));
 
 	return msg;
@@ -43,11 +50,11 @@ hpf_msg_t *hpf_msg_getmsg(u_char *data) {
 	return (hpf_msg_t *) data;
 }
 
-u_int32_t hpf_msg_getsize(hpf_msg_t *m) {
+uint32_t hpf_msg_getsize(hpf_msg_t *m) {
 	return ntohl(m->hdr.msglen);
 }
 
-u_int32_t hpf_msg_gettype(hpf_msg_t *m) {
+uint32_t hpf_msg_gettype(hpf_msg_t *m) {
 	return m->hdr.opcode;
 }
 
@@ -58,9 +65,9 @@ hpf_msg_t *hpf_msg_add_chunk(hpf_msg_t **m, const u_char *data, size_t len) {
 	if (!m || !data || !len)
 		return NULL;
 
-	l = len < 0xff ? len : 0xff;
+	l = (u_char) (len < 0xff ? len : 0xff);
 
-	*m = msg = realloc(msg, ntohl(msg->hdr.msglen) + l + 1);
+	*m = msg = (hpf_msg_t*) realloc(msg, ntohl(msg->hdr.msglen) + l + 1);
 
 	if (msg == NULL)
 		return NULL;
@@ -92,7 +99,7 @@ hpf_msg_t *hpf_msg_add_payload(hpf_msg_t **m, const u_char *data, size_t len) {
 	if (!m || !data || !len)
 		return NULL;
 
-	*m = msg = realloc(msg, ntohl(msg->hdr.msglen) + len);
+	*m = msg = (hpf_msg_t*) realloc(msg, ntohl(msg->hdr.msglen) + len);
 
 	if (msg == NULL)
 		return NULL;
@@ -119,7 +126,7 @@ hpf_msg_t *hpf_msg_error(u_char *err, size_t err_size) {
 	return msg;
 }
 
-hpf_msg_t *hpf_msg_info(u_int32_t nonce, u_char *fbname, size_t fbname_len) {
+hpf_msg_t *hpf_msg_info(uint32_t nonce, u_char *fbname, size_t fbname_len) {
 	hpf_msg_t *msg;
 
 	msg = hpf_msg_new();
@@ -131,12 +138,12 @@ hpf_msg_t *hpf_msg_info(u_int32_t nonce, u_char *fbname, size_t fbname_len) {
 
 	hpf_msg_add_chunk(&msg, fbname, fbname_len);
 
-	hpf_msg_add_payload(&msg, (u_char *) &nonce, sizeof(u_int32_t));
+	hpf_msg_add_payload(&msg, (u_char *) &nonce, sizeof(uint32_t));
 
 	return msg;
 }
 
-hpf_msg_t *hpf_msg_auth(u_int32_t nonce, u_char *ident, size_t ident_len, u_char *secret, size_t secret_len) {
+hpf_msg_t *hpf_msg_auth(uint32_t nonce, u_char *ident, size_t ident_len, u_char *secret, size_t secret_len) {
 	hpf_msg_t *msg;
 	SHA1Context ctx;
 	u_char hash[SHA1HashSize];
@@ -149,8 +156,8 @@ hpf_msg_t *hpf_msg_auth(u_int32_t nonce, u_char *ident, size_t ident_len, u_char
 	msg->hdr.opcode = OP_AUTH;
 
 	SHA1Reset(&ctx);
-	SHA1Input(&ctx, (u_int8_t *) &nonce, sizeof(nonce));
-	SHA1Input(&ctx, (u_int8_t *) secret, secret_len);
+	SHA1Input(&ctx, (u_char *) &nonce, sizeof(nonce));
+	SHA1Input(&ctx, (u_char *) secret, secret_len);
 	SHA1Result(&ctx, hash);
 
 	hpf_msg_add_chunk(&msg, ident, ident_len);
@@ -194,3 +201,4 @@ hpf_msg_t *hpf_msg_subscribe(u_char *ident, size_t ident_len, u_char *channel, s
 
 	return msg;
 }
+
